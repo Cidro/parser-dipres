@@ -94,10 +94,8 @@ function carga_contenidos (titulos_partidas) {
     console.log(("Cantidad Partidas: " + titulos_partidas.length).red);
     //Se comienza recorriendo las partidas
     titulos_partidas.each(function (i, e) {
-        if(i < 1){
         crea_partida($(this))
             .then(recorre_capitulos);
-        }
     });
 }
 

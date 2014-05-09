@@ -11,6 +11,7 @@
     "xml2js": "latest",
     "colors": "latest",
     "mysql": "latest",
-    "crypto": "latest"
+    "crypto": "latest",
+    "minimist": "latest"
   }
 }

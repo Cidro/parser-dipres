@@ -6,17 +6,28 @@ var colors = require('colors'),
     mysql = require('mysql'),
     parseString = require('xml2js').parseString,
     Iconv = require('iconv').Iconv,
-    crypto = require('crypto');;
+    crypto = require('crypto'),
+    args = require('minimist')(process.argv.slice(2));;
 
 var conn = mysql.createConnection({
   host     : 'localhost',
   user     : 'root',
-  password : 'pch090384',
-  database : 'parser_dipres'
+  password : '',
+  database : 'chile_spending'
 });
 
-var ano = '2013',
-    content_url = 'http://localhost/dipres.html',
+//Arreglo para normalizar los meses
+var meses = {'1':'3', '2':'6', '3':'9', '4':'12', '-1':'1', '-2':'2', '-4':'4', '-5':'5', '-7':'7', '-8':'8', '-10':'10', '-11':'11', '17':'7', '18':'8'};
+
+var content_url_anos = {
+        '2011' : 'http://www.dipres.gob.cl/595/w3-multipropertyvalues-15460-20971.html',
+        '2012' : 'http://www.dipres.gob.cl/595/w3-multipropertyvalues-15460-21327.html',
+        '2013' : 'http://www.dipres.gob.cl/595/w3-multipropertyvalues-15460-21672.html',
+        '2014' : 'http://www.dipres.gob.cl/595/w3-multipropertyvalues-15460-22027.html'
+    };
+
+var ano = args.y || 2013,
+    content_url = content_url_anos[ano],
     remote_files_base_url = 'http://www.dipres.gob.cl/595/',
     local_files_path = "./files/" + ano + "/",
     total_archivos = 0,
@@ -33,10 +44,10 @@ request({uri: content_url, encoding : 'binary'}, function (error, response, body
     
     total_archivos = tags_archivos_xml.length;
 
-    // Q.when(descarga_archivos_xml(tags_archivos_xml)).then(function () {
+    Q.when(descarga_archivos_xml(tags_archivos_xml)).then(function () {
         var titulos_partidas = $('#recuadros_colapsables>h3');
         carga_contenidos(titulos_partidas);
-    // });
+    });
 });
 
 function descarga_archivos_xml (tags_archivos_xml) {
@@ -94,80 +105,130 @@ function carga_contenidos (titulos_partidas) {
     console.log(("Cantidad Partidas: " + titulos_partidas.length).red);
     //Se comienza recorriendo las partidas
     titulos_partidas.each(function (i, e) {
-        crea_partida($(this))
-            .then(recorre_capitulos);
+        var tag_partida = $(this),
+            titulos_capitulos = tag_partida.next('.recuadros_colapsables').children('h3');
+
+        crea_partida(tag_partida).then(recorre_capitulos.bind(null, titulos_capitulos));
     });
 }
 
 function crea_partida (tag_partida) {
-    var def = new Q.defer(),
+    var final_def = new Q.defer(),
+        query_def = new Q.defer(),
         nombre = tag_partida.text(),
-        sql = "INSERT INTO partidas (nombre, created_at, updated_at) VALUES (?, NOW(), NOW());";
+        sql_query = "SELECT * FROM partidas WHERE nombre = ?",
+        sql_insert = "INSERT INTO partidas (nombre, created_at, updated_at) VALUES (?, NOW(), NOW());";
 
-    conn.query(sql, [nombre], function (err, row) {
-        console.log(("Se crea partida [" + nombre + "]").blue);
-        var titulos_capitulos = tag_partida.next('.recuadros_colapsables').children('h3');
-        def.resolve({titulos_capitulos : titulos_capitulos, partida_id : row.insertId});
+    conn.query(sql_query, [nombre], function (err, row) {
+        if(row.length){
+            final_def.resolve(row[0].id);
+            query_def.resolve(false);
+        } else {
+            query_def.resolve(true);
+        }
     });
 
-    return def.promise;
+    query_def.promise.then(function (crear_partida) {
+        if(crear_partida){
+            conn.query(sql_insert, [nombre], function (err, row) {
+                console.log(("Se crea partida [" + nombre + "]").blue);
+                final_def.resolve(row.insertId);
+            });
+        }
+    });
+
+    return final_def.promise;
 }
 
-function recorre_capitulos(result) {
-    console.log(("Partida " + result.partida_id + " tiene " + result.titulos_capitulos.length + " capitulos").red);
+function recorre_capitulos(titulos_capitulos, partida_id) {
+    console.log(("Partida " + partida_id + " tiene " + titulos_capitulos.length + " capitulos").red);
     //Se continua con los capitulos
-    result.titulos_capitulos.each(function (i, e) {
-        crea_capitulo($(this), result.partida_id).then(recorre_programas);
+    titulos_capitulos.each(function (i, e) {
+        var tag_capitulo = $(this),
+            titulos_programas = tag_capitulo.next('.recuadros_colapsables').children('h3');
+
+        crea_capitulo(tag_capitulo, partida_id).then(recorre_programas.bind(null, titulos_programas));
     });
 }
 
 function crea_capitulo (tag_capitulo, partida_id) {
-    var def = new Q.defer(),
+    var final_def = new Q.defer(),
+        query_def = new Q.defer(),
         nombre = tag_capitulo.text(),
-        sql = "INSERT INTO capitulos (nombre, partida_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW());";
+        sql_query = "SELECT * FROM capitulos WHERE nombre = ? AND partida_id = ?",
+        sql_insert = "INSERT INTO capitulos (nombre, partida_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW());";
 
-    conn.query(sql, [nombre, partida_id], function (err, row) {
-        console.log(("Se crea capítulo [" + nombre + "]").green);
-        var titulos_programas = tag_capitulo.next('.recuadros_colapsables').children('h3');
-        def.resolve({titulos_programas : titulos_programas, capitulo_id : row.insertId});
+    conn.query(sql_query, [nombre, partida_id], function (err, row) {
+        if(row.length){
+            final_def.resolve(row[0].id);
+            query_def.resolve(false);
+        } else {
+            query_def.resolve(true);
+        }
     });
 
-    return def.promise;
+    query_def.promise.then(function (crear_capitulo) {
+        if(crear_capitulo){
+            conn.query(sql_insert, [nombre, partida_id], function (err, row) {
+                console.log(("Se crea capítulo [" + nombre + "]").green);
+                final_def.resolve(row.insertId);
+            });
+        }
+    }) 
+
+    return final_def.promise;
 }
 
-function recorre_programas (result) {
-    console.log(("Capitulo " + result.capitulo_id + " tiene " + result.titulos_programas.length + " programas").red);
+function recorre_programas (titulos_programas, capitulo_id) {
+    console.log(("Capitulo " + capitulo_id + " tiene " + titulos_programas.length + " programas").red);
     //Se continua con los programas
-    result.titulos_programas.each(function (i, e) {
-        crea_programa($(this), result.capitulo_id).then(recorre_archivos_ejecuciones);
+    titulos_programas.each(function (i, e) {
+        var tag_programa = $(this),
+            archivos_programas = tag_programa.next('.recuadros_colapsables').find("a[href$='.xml']");
+
+        crea_programa(tag_programa, capitulo_id).then(recorre_archivos_ejecuciones.bind(null, archivos_programas));
     });
 }
 
 function crea_programa (tag_programa, capitulo_id) {
-    var def = new Q.defer(),
+    var final_def = new Q.defer(),
+        query_def = new Q.defer(),
         nombre = tag_programa.text(),
-        sql = "INSERT INTO programas (nombre, capitulo_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW());";
+        sql_query = "SELECT * FROM programas WHERE nombre = ? AND capitulo_id = ?",
+        sql_insert = "INSERT INTO programas (nombre, capitulo_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW());";
 
-    conn.query(sql, [nombre, capitulo_id], function (err, row) {
-        console.log(("Se crea programa [" + nombre + "]").cyan);
-        var archivos_programas = tag_programa.next('.recuadros_colapsables').find("a[href$='.xml']");
-        def.resolve({archivos_programas : archivos_programas, programa_id : row.insertId});
-    });
+    conn.query(sql_query, [nombre, capitulo_id], function (err, row) {
+        if(row.length){
+            final_def.resolve(row[0].id);
+            query_def.resolve(false);
+        } else {
+            query_def.resolve(true);
+        }
+    })
 
-    return def.promise;
+    query_def.promise.then(function (crear_programa) {
+        if(crear_programa){
+            conn.query(sql_insert, [nombre, capitulo_id], function (err, row) {
+                console.log(("Se crea programa [" + nombre + "]").cyan);
+                final_def.resolve(row.insertId);
+            });
+        }
+    })
+
+    return final_def.promise;
 }
 
-function recorre_archivos_ejecuciones (result) {
-    console.log(("Programa " + result.programa_id + " tiene " + result.archivos_programas.length + " archivos para el periodo " + ano).red);
-    result.archivos_programas.each(function (i, e) {
+function recorre_archivos_ejecuciones (archivos_programas, programa_id) {
+    console.log(("Programa " + programa_id + " tiene " + archivos_programas.length + " archivos para el periodo " + ano).red);
+    archivos_programas.each(function (i, e) {
         var file_name = local_files_path + e.attribs.href,
             file_content = fs.readFileSync(file_name);
 
         parseString(file_content, function (err, data) {
             var cabecera = data.matriz.cabecera[0],
-                hash_periodo = getHash(cabecera.periodo + cabecera.semestre);
+                hash_periodo = getHash(cabecera.periodo + meses[cabecera.semestre]);
 
-            cabecera.programa_id = result.programa_id;
+            cabecera.programa_id = programa_id;
 
             if(!periodos[hash_periodo])
                 periodos[hash_periodo] = crea_periodo(cabecera);
@@ -184,23 +245,26 @@ function crea_periodo (cabecera) {
     var final_def = new Q.defer(),
         query_def = new Q.defer(),
         periodo = cabecera.periodo,
-        mes = cabecera.semestre,
+        mes = meses[cabecera.semestre],
         sql = "SELECT * FROM periodos WHERE ano = ? AND mes = ?",
         sql_insert = "INSERT INTO periodos (ano, mes) VALUES (?, ?);";
 
     conn.query(sql, [ano, mes], function (err, row) {
         if(row.length){
             final_def.resolve(row[0].id);
-        } else {
             query_def.resolve(false);
+        } else {
+            query_def.resolve(true);
         }
     });
 
-    query_def.promise.then(function(){
-        conn.query(sql_insert, [ano, mes], function (err, row) {
-            console.log(("Se crea nuevo periodo: " + ano + "-" + mes).green);
-            final_def.resolve(row.insertId);
-        });
+    query_def.promise.then(function(crear_periodo){
+        if(crear_periodo){
+            conn.query(sql_insert, [ano, mes], function (err, row) {
+                console.log(("Se crea nuevo periodo: " + ano + "-" + mes).green);
+                final_def.resolve(row.insertId);
+            });
+        }
     });
 
     return final_def.promise;
@@ -213,7 +277,7 @@ function recorre_cuerpo_archivo (cabecera, periodo_id) {
             hash_caslif_econ = getHash(cuerpo.subtitulo + cuerpo.item + cuerpo.asignacion + cuerpo.nombre);
 
         var ejecucion = {
-            moneda : cabecera.moneda[0],
+            moneda : (cabecera.moneda[0] == 'P' ? 'clp' : 'usd'),
             monto : cuerpo.monto[0],
             formulado : cuerpo.formulado[0],
             vigente : cuerpo.vigente[0],
@@ -243,16 +307,19 @@ function crea_clasificacion_economica (cuerpo) {
     conn.query(sql, [subtitulo, item, asignacion, nombre], function (err, row) {
         if(row.length){
             final_def.resolve(row[0].id);
-        } else {
             query_def.resolve(false);
+        } else {
+            query_def.resolve(true);
         }
     });
 
-    query_def.promise.then(function () {
-        conn.query(sql_insert, [titulo, subtitulo, item, asignacion, nombre], function (err, row) {
-            console.log(("Se crea nueva clasificacion económica: " + nombre).green);
-            final_def.resolve(row.insertId);
-        });
+    query_def.promise.then(function (crear_clasif_econ) {
+        if(crear_clasif_econ){
+            conn.query(sql_insert, [titulo, subtitulo, item, asignacion, nombre], function (err, row) {
+                console.log(("Se crea nueva clasificacion económica: " + nombre).green);
+                final_def.resolve(row.insertId);
+            });
+        }
     });
 
     return final_def.promise;

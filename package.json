@@ -1,0 +1,16 @@
+{
+  "name": "parser-dipres",
+  "version": "0.0.1",
+  "description": "Parser para obtener los datos del sitio de la Dirección de Presupuestos del Gobierno de Chile",
+  "repository": "https://github.com/Cidro/parser-dipres",
+  "dependencies": {
+    "request": "latest",
+    "cheerio": "latest",
+    "iconv": "latest",
+    "q": "latest",
+    "xml2js": "latest",
+    "colors": "latest",
+    "mysql": "latest",
+    "crypto": "latest"
+  }
+}

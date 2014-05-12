@@ -12,8 +12,8 @@ var colors = require('colors'),
 var conn = mysql.createConnection({
   host     : 'localhost',
   user     : 'root',
-  password : '',
-  database : 'chile_spending'
+  password : 'pch090384',
+  database : 'chile_spending_prueba_parser'
 });
 
 //Arreglo para normalizar los meses
@@ -37,6 +37,8 @@ var ano = args.y || 2013,
 var periodos = [],
     clasificaciones_economicas = [];
 
+console.log(("Se comienza el parseo del año: " + ano + " en la url: " + content_url).green);
+
 request({uri: content_url, encoding : 'binary'}, function (error, response, body) {
     $ = cheerio.load(body);
 
@@ -56,35 +58,55 @@ function descarga_archivos_xml (tags_archivos_xml) {
 
     tags_archivos_xml.each(function (i, e) {
         var file_name = e.attribs.href,
-            file_url = remote_files_base_url + file_name;
-
-        archivos_descargados++;
+            file_url = remote_files_base_url + file_name,
+            file_def = new Q.defer();
 
         if(fs.existsSync(local_files_path + file_name)){
-            console.log('El archivo '.blue + file_name.red +' fué descargado previamente. Se omite su descarga.'.blue);
+            file_def.resolve('existe');
         } else {
             request({uri : file_url, encoding : 'binary'}, function(file_name, error, response, body){
 
                 if(error || response.statusCode != 200){
 
-                    console.log('Error descargando el archivo '.red + file_name.red.blue);
+                    file_def.resolve('error');
 
                 } else {
 
                     body = normalizeText(body);
-                    fs.writeFile(local_files_path + file_name, body, function (file_name, err) {
+                    fs.writeFile(local_files_path + file_name, body, function (err) {
                         if(!err){
-                            console.log('archivo '.green + file_name.red + ' descargado correctamente.'.green + ' [' + archivos_descargados + ' - ' + total_archivos + ']');
+                            file_def.resolve('descarga');
+                        } else {
+                            file_def.resolve('error');
                         }
-                    }.bind(null, file_name));
+                    });
 
                 }
 
             }.bind(null, file_name));
         }
 
-        if(archivos_descargados == total_archivos)
-            def.resolve();
+        file_def.promise.then(function (file_name, result) {
+            var msg = '';
+            archivos_descargados++;
+
+            switch(result){
+                case 'error':
+                    msg = 'Error descargando el archivo '.red + file_name.red.blue;
+                    break;
+                case 'existe':
+                    msg = 'El archivo '.blue + file_name.red +' fué descargado previamente. Se omite su descarga.'.blue;
+                    break;
+                case 'descarga':
+                    msg = 'archivo '.green + file_name.red + ' descargado correctamente.'.green;
+                    break;
+            }
+
+            console.log(msg + ' [' + archivos_descargados + ' - ' + total_archivos + ']');
+
+            if(archivos_descargados == total_archivos)
+                def.resolve();
+        }.bind(null, file_name));
     });
 
     return def.promise;
@@ -120,6 +142,7 @@ function crea_partida (tag_partida) {
         sql_insert = "INSERT INTO partidas (nombre, created_at, updated_at) VALUES (?, NOW(), NOW());";
 
     conn.query(sql_query, [nombre], function (err, row) {
+        console.log(err, row);
         if(row.length){
             final_def.resolve(row[0].id);
             query_def.resolve(false);

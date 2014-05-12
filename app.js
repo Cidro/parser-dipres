@@ -7,14 +7,10 @@ var colors = require('colors'),
     parseString = require('xml2js').parseString,
     Iconv = require('iconv').Iconv,
     crypto = require('crypto'),
-    args = require('minimist')(process.argv.slice(2));;
+    args = require('minimist')(process.argv.slice(2))
+    db_config = require('./database');
 
-var conn = mysql.createConnection({
-  host     : 'localhost',
-  user     : 'root',
-  password : 'pch090384',
-  database : 'chile_spending_prueba_parser'
-});
+var conn = mysql.createConnection(db_config);
 
 //Arreglo para normalizar los meses
 var meses = {'1':'3', '2':'6', '3':'9', '4':'12', '-1':'1', '-2':'2', '-4':'4', '-5':'5', '-7':'7', '-8':'8', '-10':'10', '-11':'11', '17':'7', '18':'8'};

@@ -1,3 +1,4 @@
 ### Parser para obtener los datos del sitio de la Dirección de Presupuestos del Gobierno de Chile
 
-Se debe crear la carpeta "files" y dentro de esta una sub carpeta para el año a parsear
+* Crear una base de datos con la estructura del archivo "schema.sql"
+* Copiar el archivo "database.sample.js" a "database.js" y modificarlo con los datos de acceso a la base de datos

@@ -3,13 +3,15 @@ SET time_zone = "+00:00";
 
 CREATE TABLE IF NOT EXISTS `capitulos` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(255) NOT NULL,
+  `codigo` varchar(10) DEFAULT NULL,
+  `nombre` varchar(255) DEFAULT NULL,
   `partida_id` int(10) unsigned NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `updated_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `codigo` (`codigo`),
   KEY `capitulos_partida_id_foreign` (`partida_id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=205 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `clasificaciones_economicas` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -24,7 +26,7 @@ CREATE TABLE IF NOT EXISTS `clasificaciones_economicas` (
   KEY `clasificaciones_economicas_item_index` (`item`),
   KEY `clasificaciones_economicas_asignacion_index` (`asignacion`),
   KEY `clasificaciones_economicas_nombre_index` (`nombre`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1991 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `ejecuciones` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -41,32 +43,36 @@ CREATE TABLE IF NOT EXISTS `ejecuciones` (
   KEY `ejecuciones_programa_id_foreign` (`programa_id`),
   KEY `ejecuciones_periodo_id_foreign` (`periodo_id`),
   KEY `ejecuciones_clasificacion_economica_id_foreign` (`clasificacion_economica_id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=30933 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `partidas` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(255) NOT NULL,
+  `codigo` varchar(10) DEFAULT NULL,
+  `nombre` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `updated_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=27 ;
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `codigo` (`codigo`)
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `periodos` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `mes` int(11) NOT NULL,
   `ano` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=4 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `programas` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(255) NOT NULL,
+  `codigo` varchar(10) DEFAULT NULL,
+  `nombre` varchar(255) DEFAULT NULL,
   `capitulo_id` int(10) unsigned NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `updated_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `codigo` (`codigo`),
   KEY `programas_capitulo_id_foreign` (`capitulo_id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=utf8 AUTO_INCREMENT=314 ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 ALTER TABLE `capitulos`
   ADD CONSTRAINT `capitulos_partida_id_foreign` FOREIGN KEY (`partida_id`) REFERENCES `partidas` (`id`) ON DELETE CASCADE;
